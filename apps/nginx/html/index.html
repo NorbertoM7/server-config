@@ -1,10 +1,124 @@
   <!DOCTYPE html>
   <html>
   <head>
-      <title>Pi Server</title>
+      <meta charset="UTF-8">
+      <title>Pi Dashboard</title>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <style>
+          body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: white; }
+          h1 { text-align: center; }
+          .charts { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+          .chart-box { background: #16213e; padding: 20px; border-radius: 10px; }
+          canvas { max-width: 300px; }
+          #updated { text-align: center; color: #888; margin-top: 20px; }
+          #links { background: #16213e; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 400px; }
+          #links h3 { margin-top: 0; }
+          #links a { color: #e94560; display: block; padding: 8px 0; text-decoration: none; }
+          #links a:hover { color: #fff; }
+      </style>
   </head>
   <body>
-      <h1>It works!</h1>
-      <p>Running on Raspberry Pi</p>
+      <h1>Pi Dashboard</h1>
+      <div id="links">
+          <h3>Quick Links</h3>
+          <div id="linkList">Loading...</div>
+      </div>
+      <div class="charts">
+          <div class="chart-box">
+              <h3>Total RAM Allocation</h3>
+              <canvas id="totalChart"></canvas>
+          </div>
+          <div class="chart-box">
+              <h3>Per Container (Used vs Free)</h3>
+              <canvas id="containerChart"></canvas>
+          </div>
+      </div>
+      <p id="updated">Loading...</p>
+      <script>
+          let totalChart, containerChart;
+
+          async function loadStats() {
+              const res = await fetch('http://pi.local:5000/stats');
+              const data = await res.json();
+
+              // Build links
+              let linksHtml = '';
+              data.containers.forEach(c => {
+                  const ports = c.ports || [];
+                  ports.forEach(port => {
+                      const url = 'http://pi.local:' + port;
+                      linksHtml += '<a href="' + url + '" target="_blank">' + c.name + ' → ' + url + '</a>';
+                  });
+              });
+              document.getElementById('linkList').innerHTML = linksHtml || 'No exposed ports';
+
+              const totalLabels = data.containers.map(c => c.name);
+              totalLabels.push('Free RAM');
+              const totalValues = data.containers.map(c => c.used);
+              totalValues.push(data.free_ram);
+
+              const containerLabels = data.containers.map(c => c.name);
+              const usedData = data.containers.map(c => c.used);
+              const unusedData = data.containers.map(c => c.unused);
+
+              if (!totalChart) {
+                  totalChart = new Chart(document.getElementById('totalChart'), {
+                      type: 'pie',
+                      data: {
+                          labels: totalLabels,
+                          datasets: [{
+                              data: totalValues,
+                              backgroundColor: ['#e94560', '#0f3460', '#533483', '#f39c12', '#27ae60']
+                          }]
+                      },
+                      options: {
+                          animation: { duration: 500 },
+                          plugins: {
+                              legend: { labels: { color: 'white' } },
+                              tooltip: {
+                                  callbacks: {
+                                      label: (ctx) => ctx.label + ': ' + ctx.raw.toFixed(1) + ' MB'
+                                  }
+                              }
+                          }
+                      }
+                  });
+
+                  containerChart = new Chart(document.getElementById('containerChart'), {
+                      type: 'bar',
+                      data: {
+                          labels: containerLabels,
+                          datasets: [
+                              { label: 'Used (MB)', data: usedData, backgroundColor: '#e94560' },
+                              { label: 'Unused (MB)', data: unusedData, backgroundColor: '#0f3460' }
+                          ]
+                      },
+                      options: {
+                          animation: { duration: 500 },
+                          indexAxis: 'y',
+                          scales: {
+                              x: { stacked: true, ticks: { color: 'white' } },
+                              y: { stacked: true, ticks: { color: 'white' } }
+                          },
+                          plugins: { legend: { labels: { color: 'white' } } }
+                      }
+                  });
+              } else {
+                  totalChart.data.labels = totalLabels;
+                  totalChart.data.datasets[0].data = totalValues;
+                  totalChart.update('none');
+
+                  containerChart.data.labels = containerLabels;
+                  containerChart.data.datasets[0].data = usedData;
+                  containerChart.data.datasets[1].data = unusedData;
+                  containerChart.update('none');
+              }
+
+              document.getElementById('updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+          }
+
+          loadStats();
+          setInterval(loadStats, 5000);
+      </script>
   </body>
   </html>

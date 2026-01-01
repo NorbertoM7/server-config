@@ -1,8 +1,15 @@
-  services:
     web:
       image: nginx
       ports:
         - "80:80"
       volumes:
         - ./html:/usr/share/nginx/html
+      restart: unless-stopped
+
+    api:
+      build: ./api
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      ports:
+        - "5000:5000"
       restart: unless-stopped
