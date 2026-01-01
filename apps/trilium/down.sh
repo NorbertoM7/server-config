@@ -1,4 +1,4 @@
-#!/bin/bash
+  #!/bin/bash
   cd "$(dirname "$0")"
   docker-compose down
-  echo "Nginx stopped."
+  echo "Trilium stopped."

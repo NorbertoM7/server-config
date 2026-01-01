@@ -1,0 +1,5 @@
+# Swap files
+*.swp
+
+# App data (not config)
+apps/*/data/
